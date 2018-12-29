@@ -1,0 +1,8 @@
+FROM golang:latest
+
+ADD . $GOPATH/src/[image]
+WORKDIR $GOPATH/src/[image]
+
+CMD dep ensure -update
+
+EXPOSE 9000
