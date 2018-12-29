@@ -1,5 +1,9 @@
 FROM golang:latest
 
+ARG APPENV
+
+ENV APPENV=${APPENV}
+
 ADD . $GOPATH/src/[image]
 WORKDIR $GOPATH/src/[image]
 
