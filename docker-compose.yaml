@@ -1,0 +1,153 @@
+version: 3
+services:
+
+  ## --== Databases ==-- ##
+  
+  mariadb:
+    image: wodby/mariadb:latest
+    environment:
+      MYSQL_ROOT_PASSWORD: root_pass
+      MYSQL_DATABASE: mardatabase
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    container_name: mariadb_name
+      
+  postgres:
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_USER: pg_user
+      POSTGRES_PASSWORD: pg_pass
+      POSTGRES_DATABASE: pg_db
+    container_name: postgres_name
+    
+  mongodb:
+    image: mongo:latest
+    environment:
+      - MONGO_DATA_DIR=/data/db
+      - MONGO_LOG_DIR=/dev/null
+    volumes:
+      - ./data:/data
+    ports:
+      - 27017:27017
+    command: mongod --smallfiles --logpath=/dev/null # --quiet
+    container_name: mongodb_name
+    
+  ## --== Database Management ==-- ##
+  
+  adminer:
+    image: wodby/adminer:4.3-1.1.0
+    environment:
+      ADMINER_SALT: adminer-salt
+    ports:
+      - 9001:9000
+    labels:
+      - 'traefik.backend=adminer'
+      - 'traefik.port=9000'
+      - 'traefik.frontend.rule=Host:adminer.drupal.docker.localhost'
+    
+  ## --== Stacks ==-- ##
+  
+  portainer:
+    image: portainer/portainer
+    command: --no-auth -H unix:///var/run/docker.sock
+    ports:
+      - 9999:9000
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    labels:
+      - 'traefik.backend=portainer'
+      - 'traefik.port=9000'
+      - 'traefik.frontend.rule=Host:portainer.drupal.docker.localhost'
+      
+  # Drupal
+  php:
+    image: wodby/drupal-php:latest
+    environment:
+      PHP_SENDMAIL_PATH: /usr/sbin/sendmail -t -i -S mailhog:1025
+      PHP_FPM_CLEAR_ENV: no
+      DB_HOST: mariadb
+      DB_USER: db_user
+      DB_PASSWORD: db_pass
+      DB_NAME: db_name
+      DB_DRIVER: mysql
+    ports:
+      - 9000:9000
+    volumes:
+      - .:/var/www/html
+
+  nginx:
+    image: wodby/drupal-nginx:latest
+    depends_on:
+      - php
+    environment:
+      NGINX_STATIC_CONTENT_OPEN_FILE_CACHE: off
+      NGINX_ERROR_LOG_LEVEL: debug
+      NGINX_BACKEND_HOST: php
+      NGINX_SERVER_ROOT: /var/www/html
+    volumes:
+      - .:/var/www/html
+    ports:
+      - 8001:80
+    labels:
+      - 'traefik.backend=nginx'
+      - 'traefik.port=80'
+      - 'traefik.frontend.rule=Host:drupal.docker.localhost'
+      
+  # Go
+  # this stack uses Dockerfile. see DockerGOfile.
+  go:
+    build: .
+    ports:
+      - 9000:9000
+    image: [image]:[branch]
+    volumes:
+      - ./:/go/src/[image]
+    links:
+      - postgres_server
+      - redis_server
+      - rabbitmq_server
+    environment:
+      - PGHOST=pg_host
+      - PGUSER=pg_user
+      - PGPASS=pg_pass
+      - DBNAME=db_name
+      - APPENV=development
+    container_name: go_name
+      
+  # Reverse proxy - Load balancer
+  traefik:
+    image: traefik
+    command: -c /dev/null --web --docker --logLevel=INFO
+    ports:
+      - '8000:80'
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  ## --== Caches ==-- ##
+
+  redis:
+    image: redis:latest
+    ports:
+      - 6379:6379
+    volumes:
+      - .:/redis_cache_volume
+    command: redis-server --appendonly yes
+    
+  ## --== Queue ==-- ##
+  
+  rabbitmq_server:
+    image: rabbitmq
+    environment:
+      RABBITMQ_ERLANG_COOKIE: ABCDE12345
+      RABBITMQ_DEFAULT_USER: bunny_user
+      RABBITMQ_DEFAULT_PASS: bunny_pass
+      RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      - 5672:5672
+    container_name: rabbitmq_name
+    
+networks: 
+  default:
+    external:
+      name: docker-network
