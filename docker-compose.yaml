@@ -11,6 +11,18 @@ services:
       MYSQL_USER: user
       MYSQL_PASSWORD: password
     container_name: mariadb_name
+
+  mysqldb:
+    image: mysql:latest
+    # volumes:
+    #   - db_data:/var/lib/mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: mysql_table
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    container_name: mysqldb_name
       
   postgres:
     image: postgres
@@ -23,14 +35,14 @@ services:
     
   mongodb:
     image: mongo:latest
-    environment:
-      - MONGO_DATA_DIR=/data/db
-      - MONGO_LOG_DIR=/dev/null
-    volumes:
-      - ./data:/data
+    # environment:
+    #   - MONGO_DATA_DIR=/data/db
+    #   - MONGO_LOG_DIR=/dev/null
+    # volumes:
+    #   - ./data:/data
     ports:
       - 27017:27017
-    command: mongod --smallfiles --logpath=/dev/null # --quiet
+    # command: mongod --smallfiles --logpath=/dev/null # --quiet
     container_name: mongodb_name
     
   ## --== Database Management ==-- ##
